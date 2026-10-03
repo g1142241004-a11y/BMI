@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧 BMI 身體質量指數計算器 - 衛福部極致簡約分級卡片版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Outfit', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        bmi: {
+                            under: '#38BDF8',    /* 冰藍 - 過輕 (<18.5) */
+                            normal: '#10B981',   /* 翡翠綠 - 正常 (18.5-24) */
+                            over: '#F59E0B',     /* 琥珀黃 - 過重 (24-27) */
+                            mild: '#F97316',     /* 珊瑚橘 - 輕度肥胖 (27-30) */
+                            moderate: '#EF4444', /* 玫瑰紅 - 中度肥胖 (30-35) */
+                            severe: '#A855F7'    /* 紫羅蘭 - 重度肥胖 (>=35) */
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #0b0f19;
+            color: #f8fafc;
+        }
+
+        .font-display {
+            font-family: 'Outfit', 'Inter', sans-serif;
+        }
+
+        /* Glassmorphism Card Style */
+        .glass-card {
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+        }
+
+        .glass-card-subtle {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        /* Smooth tooltip position transition */
+        #floating-badge-group {
+            transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Active Category Card Glowing Effect */
+        .active-category-card {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 12px 25px -5px rgba(0, 0, 0, 0.5);
+            border-width: 2px !important;
+            opacity: 1 !important;
+        }
+
+        .inactive-category-card {
+            opacity: 0.45;
+            filter: grayscale(0.2);
+            transform: scale(1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .inactive-category-card:hover {
+            opacity: 0.75;
+        }
+
+        /* Avatar Pop Animation */
+        @keyframes avatarFadeIn {
+            0% { opacity: 0; transform: scale(0.9) translateY(6px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-silhouette {
+            animation: avatarFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Input Number Clean */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="min-h-full flex flex-col justify-between antialiased text-slate-100">
+
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                    <i class="fa-solid fa-heart-pulse text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-white text-base sm:text-lg leading-tight font-display tracking-wide">BMI Pro <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-sans ml-1">衛福部旗艦版</span></h1>
+                    <p class="text-[11px] text-slate-400">極簡模組化卡片 • 高精度直尺進度條</p>
+                </div>
+            </div>
+            <button onclick="scrollToHistory()" class="text-xs sm:text-sm font-semibold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3.5 py-2 rounded-xl transition flex items-center space-x-2">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>歷史紀錄</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-grow w-full space-y-8">
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <!-- LEFT COLUMN: Input Controls -->
+            <section class="lg:col-span-5 glass-card p-6 sm:p-8 rounded-3xl space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center space-x-2 font-display">
+                            <i class="fa-solid fa-sliders text-indigo-400"></i>
+                            <span>身體參數設定</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">可透過數字輸入或滑桿即時調節</p>
+                    </div>
+
+                    <!-- Unit Switcher Toggle -->
+                    <div class="inline-flex p-1 bg-slate-800/90 rounded-xl text-xs font-semibold text-slate-400 border border-slate-700/60">
+                        <button type="button" id="unit-metric-btn" onclick="switchUnit('metric')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-md transition font-bold">公制 (cm/kg)</button>
+                        <button type="button" id="unit-imperial-btn" onclick="switchUnit('imperial')" class="px-3 py-1.5 rounded-lg hover:text-white transition font-medium text-slate-400">英制 (ft/lb)</button>
+                    </div>
+                </div>
+
+                <form id="bmi-form" onsubmit="calculateBMI(event)" class="space-y-6">
+                    
+                    <!-- Gender Selection -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">性別 (自動同步視覺體型)</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gender" value="male" checked onchange="calculateBMI()" class="peer sr-only">
+                                <div class="p-3 text-center rounded-2xl border border-slate-700/80 bg-slate-800/40 peer-checked:border-indigo-500 peer-checked:bg-indigo-500/10 peer-checked:text-indigo-400 transition flex items-center justify-center space-x-2 font-medium text-slate-300">
+                                    <i class="fa-solid fa-mars text-indigo-400"></i>
+                                    <span>男性 (Male)</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gender" value="female" onchange="calculateBMI()" class="peer sr-only">
+                                <div class="p-3 text-center rounded-2xl border border-slate-700/80 bg-slate-800/40 peer-checked:border-rose-500 peer-checked:bg-rose-500/10 peer-checked:text-rose-400 transition flex items-center justify-center space-x-2 font-medium text-slate-300">
+                                    <i class="fa-solid fa-venus text-rose-400"></i>
+                                    <span>女性 (Female)</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Age Input -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="input-age" class="text-xs font-bold text-slate-400 uppercase tracking-wider">年齡 (歲)</label>
+                            <span id="age-val-display" class="text-xs font-bold text-indigo-400 font-display">25 歲</span>
+                        </div>
+                        <div class="relative">
+                            <input type="number" id="input-age" value="25" min="10" max="120" required oninput="syncAgeSlider(); calculateBMI();"
+                                class="w-full px-4 py-2.5 bg-slate-800/80 rounded-2xl border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-white font-semibold text-base transition pl-11">
+                            <i class="fa-solid fa-cake-candles absolute left-4 top-3.5 text-slate-500 text-sm"></i>
+                        </div>
+                    </div>
+
+                    <!-- METRIC INPUTS -->
+                    <div id="metric-inputs" class="space-y-5">
+                        <!-- Height Input & Slider -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label for="input-height-cm" class="text-xs font-bold text-slate-400 uppercase tracking-wider">身高 (cm)</label>
+                                <span id="ideal-weight-badge-cm" class="text-xs font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-md border border-indigo-500/20">理想: 53.5-69.1 kg</span>
+                            </div>
+                            <div class="relative mb-2">
+                                <input type="number" id="input-height-cm" value="170" min="50" max="250" step="0.5" oninput="syncHeightSlider(); updateIdealWeightBadge(); calculateBMI();"
+                                    class="w-full px-4 py-2.5 bg-slate-800/80 rounded-2xl border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-white font-semibold text-base transition pl-11">
+                                <i class="fa-solid fa-ruler-vertical absolute left-4 top-3.5 text-slate-500 text-sm"></i>
+                            </div>
+                            <input type="range" id="slider-height-cm" min="120" max="220" value="170" oninput="syncHeightInput(); updateIdealWeightBadge(); calculateBMI();" class="w-full">
+                        </div>
+
+                        <!-- Weight Input & Slider -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label for="input-weight-kg" class="text-xs font-bold text-slate-400 uppercase tracking-wider">體重 (kg)</label>
+                                <span id="weight-val-display" class="text-xs font-bold text-slate-300 font-display">65.0 kg</span>
+                            </div>
+                            <div class="relative mb-2">
+                                <input type="number" id="input-weight-kg" value="65" min="20" max="300" step="0.1" oninput="syncWeightSlider(); calculateBMI();"
+                                    class="w-full px-4 py-2.5 bg-slate-800/80 rounded-2xl border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-white font-semibold text-base transition pl-11">
+                                <i class="fa-solid fa-weight-scale absolute left-4 top-3.5 text-slate-500 text-sm"></i>
+                            </div>
+                            <input type="range" id="slider-weight-kg" min="30" max="150" step="0.5" value="65" oninput="syncWeightInput(); calculateBMI();" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- IMPERIAL INPUTS (Hidden by default) -->
+                    <div id="imperial-inputs" class="space-y-5 hidden">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">身高 (英呎 ft / 吋 in)</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="relative">
+                                    <input type="number" id="input-height-ft" value="5" min="1" max="8" oninput="calculateBMI()"
+                                        class="w-full px-4 py-2.5 bg-slate-800/80 rounded-2xl border border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-white font-semibold text-base transition pl-11">
+                                    <span class="absolute left-4 top-3 text-xs font-bold text-slate-500">FT</span>
+                                </div>
+                                <div class="relative">
+                                    <input type="number" id="input-height-in" value="7" min="0" max="11" oninput="calculateBMI()"
+                                        class="w-full px-4 py-2.5 bg-slate-800/80 rounded-2xl border border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-white font-semibold text-base transition pl-11">
+                                    <span class="absolute left-4 top-3 text-xs font-bold text-slate-500">IN</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="input-weight-lbs" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">體重 (磅 lbs)</label>
+                            <div class="relative">
+                                <input type="number" id="input-weight-lbs" value="143" min="40" max="700" step="0.5" oninput="calculateBMI()"
+                                    class="w-full px-4 py-2.5 bg-slate-800/80 rounded-2xl border border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-white font-semibold text-base transition pl-11">
+                                <i class="fa-solid fa-weight-scale absolute left-4 top-3.5 text-slate-500 text-sm"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save / Calculate Button -->
+                    <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:to-pink-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/25 transition-all transform active:scale-[0.98] flex items-center justify-center space-x-2 text-base">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>儲存為紀錄</span>
+                    </button>
+                </form>
+            </section>
+
+            <!-- RIGHT COLUMN: Main BMI Result Summary & High Precision Segment Bar -->
+            <section class="lg:col-span-7 space-y-6">
+                
+                <div class="glass-card p-6 sm:p-8 rounded-3xl space-y-8 relative overflow-hidden">
+                    
+                    <!-- Top Summary & Body Silhouette Row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                        
+                        <!-- Left: BMI Score Big Panel -->
+                        <div class="sm:col-span-7 text-center sm:text-left space-y-3">
+                            <div class="flex items-center justify-center sm:justify-start space-x-2">
+                                <span class="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-slate-800 text-indigo-400 border border-slate-700" id="gender-age-tag">
+                                    男性 • 25歲
+                                </span>
+                            </div>
+                            <div class="text-slate-400 text-xs font-medium uppercase tracking-wider">BMI 身體質量指數</div>
+                            
+                            <div class="flex items-baseline justify-center sm:justify-start space-x-2">
+                                <span id="bmi-score" class="text-6xl sm:text-7xl font-extrabold text-white tracking-tight font-display">22.5</span>
+                                <span class="text-slate-400 font-medium text-base">kg/m²</span>
+                            </div>
+
+                            <div id="status-badge" class="inline-flex items-center space-x-2.5 px-4 py-2 rounded-2xl text-white font-bold text-base bg-emerald-500 shadow-lg shadow-emerald-500/20">
+                                <i id="status-icon-mini" class="fa-solid fa-circle-check"></i>
+                                <span id="status-text">健康正常</span>
+                            </div>
+
+                            <div id="target-weight-box" class="text-xs font-medium text-slate-400 pt-1">
+                                <!-- Target gain/loss notice -->
+                            </div>
+                        </div>
+
+                        <!-- Right: Flat Silhouette Vector Container -->
+                        <div class="sm:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl glass-card-subtle relative border border-slate-800/80">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">對應擬真體型</div>
+                            
+                            <div id="silhouette-container" class="w-28 h-40 flex items-center justify-center animate-silhouette">
+                                <!-- Dynamic SVG inserted here -->
+                            </div>
+
+                            <span id="silhouette-label" class="text-xs font-bold text-slate-200 mt-2 bg-slate-800/90 px-3 py-1 rounded-full border border-slate-700/80">
+                                身材標緻勻稱
+                            </span>
+                        </div>
+
+                    </div>
+
+                    <!-- HIGH PRECISION SEGMENT BAR WITH FLOATING TOOLTIP -->
+                    <div class="pt-6 border-t border-slate-800/80 space-y-6">
+                        <div class="flex justify-between items-center text-xs font-bold text-slate-300">
+                            <span class="flex items-center space-x-2">
+                                <i class="fa-solid fa-chart-simple text-indigo-400"></i>
+                                <span>衛福部標準高精度分段進度條</span>
+                            </span>
+                            <span id="indicator-bmi-val" class="text-emerald-400 font-display font-bold text-sm">22.5</span>
+                        </div>
+
+                        <!-- Precision Segment Bar Canvas Container -->
+                        <div class="relative pt-12 pb-2 px-1">
+                            
+                            <!-- Floating Badge Indicator Pointer -->
+                            <div id="floating-badge-group" class="absolute top-0 -translate-x-1/2 flex flex-col items-center z-20" style="left: 37.5%;">
+                                <div id="floating-badge-bg" class="bg-emerald-500 text-white text-xs font-extrabold px-3 py-1 rounded-full shadow-lg whitespace-nowrap flex items-center space-x-1 border border-white/20">
+                                    <span id="floating-badge-score">22.5</span>
+                                    <span class="opacity-80">BMI</span>
+                                </div>
+                                <div id="floating-badge-arrow" class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-emerald-500 -mt-0.5"></div>
+                            </div>
+
+                            <!-- Multi-segmented Progress Bar -->
+                            <div class="h-4 w-full bg-slate-900 rounded-full overflow-hidden flex p-0.5 border border-slate-800 shadow-inner">
+                                <!-- Segment 1: <18.5 (17.5%) -->
+                                <div class="h-full bg-sky-400 rounded-l-full relative group cursor-pointer" style="width: 17.5%;" title="過輕 (<18.5)"></div>
+                                <!-- Segment 2: 18.5 - 24 (27.5%) -->
+                                <div class="h-full bg-emerald-500 relative group cursor-pointer" style="width: 27.5%;" title="正常 (18.5-24)"></div>
+                                <!-- Segment 3: 24 - 27 (15%) -->
+                                <div class="h-full bg-amber-500 relative group cursor-pointer" style="width: 15%;" title="過重 (24-27)"></div>
+                                <!-- Segment 4: 27 - 30 (15%) -->
+                                <div class="h-full bg-orange-500 relative group cursor-pointer" style="width: 15%;" title="輕度肥胖 (27-30)"></div>
+                                <!-- Segment 5: 30 - 35 (15%) -->
+                                <div class="h-full bg-rose-500 relative group cursor-pointer" style="width: 15%;" title="中度肥胖 (30-35)"></div>
+                                <!-- Segment 6: >=35 (10%) -->
+                                <div class="h-full bg-purple-500 rounded-r-full relative group cursor-pointer" style="width: 10%;" title="重度肥胖 (≥35)"></div>
+                            </div>
+
+                            <!-- Ticks & Labels below Progress Bar -->
+                            <div class="relative w-full text-[11px] font-bold text-slate-400 mt-2 h-5">
+                                <span class="absolute left-0 -translate-x-1/2">15</span>
+                                <span class="absolute text-sky-400" style="left: 17.5%; transform: translateX(-50%);">18.5</span>
+                                <span class="absolute text-emerald-400" style="left: 45%; transform: translateX(-50%);">24</span>
+                                <span class="absolute text-amber-400" style="left: 60%; transform: translateX(-50%);">27</span>
+                                <span class="absolute text-orange-400" style="left: 75%; transform: translateX(-50%);">30</span>
+                                <span class="absolute text-rose-400" style="left: 90%; transform: translateX(-50%);">35</span>
+                                <span class="absolute right-0 translate-x-1/2 text-purple-400">40+</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Health Advice Box -->
+                    <div class="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-start space-x-3">
+                        <div class="p-2 rounded-xl bg-indigo-500 text-white shrink-0 mt-0.5">
+                            <i class="fa-solid fa-lightbulb"></i>
+                        </div>
+                        <div class="space-y-1 text-xs sm:text-sm">
+                            <h4 class="font-bold text-indigo-200">健康建議與卡路里參考</h4>
+                            <p id="health-advice" class="text-slate-300 leading-relaxed">
+                                您的體重維持在理想範圍內！請繼續保持均衡飲食與規律運動，維護良好的健康狀態。
+                            </p>
+                            <div class="pt-1 text-slate-400 text-xs font-medium flex flex-wrap gap-x-4 gap-y-1">
+                                <div><span class="font-bold text-slate-200">理想體重範圍：</span> <span id="ideal-weight-range" class="text-indigo-400 font-bold">53.5 ~ 69.1 kg</span></div>
+                                <div><span class="font-bold text-slate-200">每日基礎熱量參考：</span> <span id="calorie-recommendation" class="text-indigo-400 font-bold">1600 ~ 1900 kcal</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+        </div>
+
+        <!-- MOHW 6 MODULAR CATEGORY CARDS MATRIX -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center space-x-2 font-display">
+                        <i class="fa-solid fa-grip text-indigo-400"></i>
+                        <span>衛福部 BMI 6 大分級卡片矩陣</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">系統將根據計算結果自動點亮當前的體重分級卡片</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                
+                <!-- Card 1: UNDER -->
+                <div id="cat-card-UNDER" class="glass-card p-4 rounded-2xl border border-sky-500/30 inactive-category-card relative overflow-hidden flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="w-3 h-3 rounded-full bg-sky-400"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-sky-400 px-1.5 py-0.5 rounded bg-sky-400/10">&lt; 18.5</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">體重過輕</h4>
+                        <p class="text-[11px] text-slate-400">營養攝取可能不足，需注意免疫力。</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-400 text-[10px]">增重提醒</span>
+                        <i class="fa-solid fa-circle-check check-icon hidden text-sky-400"></i>
+                    </div>
+                </div>
+
+                <!-- Card 2: NORMAL -->
+                <div id="cat-card-NORMAL" class="glass-card p-4 rounded-2xl border border-emerald-500/30 inactive-category-card relative overflow-hidden flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10">18.5 - 24</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">健康正常</h4>
+                        <p class="text-[11px] text-slate-400">最理想的標準區間，請繼續維持。</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-400 text-[10px]">完美標準</span>
+                        <i class="fa-solid fa-circle-check check-icon hidden text-emerald-400"></i>
+                    </div>
+                </div>
+
+                <!-- Card 3: OVER -->
+                <div id="cat-card-OVER" class="glass-card p-4 rounded-2xl border border-amber-500/30 inactive-category-card relative overflow-hidden flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 px-1.5 py-0.5 rounded bg-amber-500/10">24 - 27</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">體重過重</h4>
+                        <p class="text-[11px] text-slate-400">微幅超標，建議控制高卡路里飲食。</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-400 text-[10px]">飲食控制</span>
+                        <i class="fa-solid fa-circle-check check-icon hidden text-amber-400"></i>
+                    </div>
+                </div>
+
+                <!-- Card 4: MILD -->
+                <div id="cat-card-MILD" class="glass-card p-4 rounded-2xl border border-orange-500/30 inactive-category-card relative overflow-hidden flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="w-3 h-3 rounded-full bg-orange-500"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-orange-400 px-1.5 py-0.5 rounded bg-orange-500/10">27 - 30</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">輕度肥胖</h4>
+                        <p class="text-[11px] text-slate-400">宜開始有氧運動，減少糖分攝取。</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-400 text-[10px]">加強運動</span>
+                        <i class="fa-solid fa-circle-check check-icon hidden text-orange-400"></i>
+                    </div>
+                </div>
+
+                <!-- Card 5: MODERATE -->
+                <div id="cat-card-MODERATE" class="glass-card p-4 rounded-2xl border border-rose-500/30 inactive-category-card relative overflow-hidden flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400 px-1.5 py-0.5 rounded bg-rose-500/10">30 - 35</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">中度肥胖</h4>
+                        <p class="text-[11px] text-slate-400">慢性病風險增加，建議規劃減重。</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-400 text-[10px]">系統減重</span>
+                        <i class="fa-solid fa-circle-check check-icon hidden text-rose-400"></i>
+                    </div>
+                </div>
+
+                <!-- Card 6: SEVERE -->
+                <div id="cat-card-SEVERE" class="glass-card p-4 rounded-2xl border border-purple-500/30 inactive-category-card relative overflow-hidden flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400 px-1.5 py-0.5 rounded bg-purple-500/10">&ge; 35</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">重度肥胖</h4>
+                        <p class="text-[11px] text-slate-400">高度警惕心血管，建議尋求門診。</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-400 text-[10px]">醫療諮詢</span>
+                        <i class="fa-solid fa-circle-check check-icon hidden text-purple-400"></i>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- History Records Section -->
+        <section id="history-section" class="glass-card p-6 sm:p-8 rounded-3xl space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center space-x-2 font-display">
+                        <i class="fa-solid fa-history text-indigo-400"></i>
+                        <span>歷史測量紀錄</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">紀錄儲存於本地端瀏覽器 (localStorage)</p>
+                </div>
+                <button onclick="clearHistory()" class="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg transition font-medium flex items-center space-x-1">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>清除所有紀錄</span>
+                </button>
+            </div>
+
+            <!-- History Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            <th class="py-3 px-4">日期時間</th>
+                            <th class="py-3 px-4">性別/年齡</th>
+                            <th class="py-3 px-4">身高 / 體重</th>
+                            <th class="py-3 px-4">BMI 數值</th>
+                            <th class="py-3 px-4">判定結果</th>
+                            <th class="py-3 px-4 text-right">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="divide-y divide-slate-800 text-sm">
+                        <!-- History rows inserted dynamically -->
+                    </tbody>
+                </table>
+                <div id="no-history-msg" class="text-center py-8 text-slate-500 text-xs space-y-2">
+                    <i class="fa-solid fa-folder-open text-3xl text-slate-600"></i>
+                    <p>尚無任何歷史量測紀錄</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
+        <p>© 2026 BMI Pro 智慧健康計算網 • 依衛福部國民健康署衛生標準設計</p>
+    </footer>
+
+    <script>
+        // Current unit mode
+        let currentUnit = 'metric';
+
+        // FLAT DESIGN ELEGANT BODY SILHOUETTES
+        const MALE_SILHOUETTES = {
+            UNDER: `<svg class="w-full h-full text-sky-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="11"/>
+                <path d="M48 34 h4 v8 h-4 z"/>
+                <path d="M 50 42 C 40 42 38 50 36 62 L 32 105 C 31 112 37 113 38 105 L 42 66 L 43 120 L 40 185 C 39 193 46 194 47 185 L 49 130 L 51 130 L 53 185 C 54 194 61 193 60 185 L 57 120 L 58 66 L 62 105 C 63 113 69 112 68 105 L 64 62 C 62 50 60 42 50 42 Z"/>
+            </svg>`,
+            NORMAL: `<svg class="w-full h-full text-emerald-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="11.5"/>
+                <path d="M47.5 34.5 h5 v7.5 h-5 z"/>
+                <path d="M 50 42 C 37 42 34 50 32 64 L 28 106 C 27 114 34 114 35 106 L 39 70 L 41 122 L 38 185 C 37 194 45 195 47 185 L 49.5 132 L 50.5 132 L 53 185 C 55 195 63 194 62 185 L 59 122 L 61 70 L 65 106 C 66 114 73 114 72 106 L 68 64 C 66 50 63 42 50 42 Z"/>
+            </svg>`,
+            OVER: `<svg class="w-full h-full text-amber-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="12"/>
+                <path d="M 50 42 C 34 42 30 52 28 66 L 24 108 C 23 116 30 116 32 108 L 36 74 L 38 122 L 35 185 C 34 194 43 195 45 185 L 49 133 L 51 133 L 55 185 C 57 195 66 194 65 185 L 62 122 L 64 74 L 68 108 C 70 116 77 116 76 108 L 72 66 C 70 52 66 42 50 42 Z"/>
+            </svg>`,
+            MILD: `<svg class="w-full h-full text-orange-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="12.5"/>
+                <path d="M 50 41 C 31 41 26 53 24 68 L 20 110 C 19 118 27 118 29 110 L 33 76 C 33 90 35 110 36 123 L 32 185 C 31 194 41 195 44 185 L 48 134 L 52 134 L 56 185 C 59 195 69 194 68 185 L 64 123 C 65 110 67 90 67 76 L 71 110 C 73 118 81 118 80 110 L 76 68 C 74 53 69 41 50 41 Z"/>
+            </svg>`,
+            MODERATE: `<svg class="w-full h-full text-rose-500" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="13"/>
+                <path d="M 50 40 C 27 40 22 54 19 70 L 15 112 C 14 120 23 120 26 112 L 30 78 C 29 96 32 114 34 124 L 29 185 C 28 195 39 196 42 185 L 47 135 L 53 135 L 58 185 C 61 196 72 195 71 185 L 66 124 C 68 114 71 96 70 78 L 74 112 C 77 120 86 120 85 112 L 81 70 C 78 54 73 40 50 40 Z"/>
+            </svg>`,
+            SEVERE: `<svg class="w-full h-full text-purple-500" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="13.5"/>
+                <path d="M 50 39 C 22 39 17 55 14 72 L 10 114 C 9 122 19 122 22 114 L 26 80 C 25 100 29 118 31 125 L 26 185 C 25 196 37 197 40 185 L 46 136 L 54 136 L 60 185 C 63 197 75 196 74 185 L 69 125 C 71 118 75 100 74 80 L 78 114 C 81 122 91 122 90 114 L 86 72 C 83 55 78 39 50 39 Z"/>
+            </svg>`
+        };
+
+        const FEMALE_SILHOUETTES = {
+            UNDER: `<svg class="w-full h-full text-sky-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="10.5"/>
+                <path d="M 50 41 C 41 41 39 48 37 60 Q 42 70 38 82 Q 43 92 37 105 C 36 112 42 113 43 105 L 44 80 L 44 120 L 41 185 C 40 193 47 194 48 185 L 49.5 130 L 50.5 130 L 52 185 C 53 194 60 193 59 185 L 56 120 L 56 80 L 57 105 C 58 113 64 112 63 105 Q 57 92 62 82 Q 58 70 63 60 C 61 48 59 41 50 41 Z"/>
+            </svg>`,
+            NORMAL: `<svg class="w-full h-full text-emerald-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="11"/>
+                <path d="M 50 41 C 39 41 36 48 34 60 Q 41 72 35 84 Q 44 98 35 106 C 34 114 41 114 42 106 L 44 80 L 43 122 L 39 185 C 38 194 46 195 48 185 L 49.5 132 L 50.5 132 L 52 185 C 54 195 62 194 61 185 L 57 122 L 56 80 L 58 106 C 59 114 66 114 65 106 Q 56 98 65 84 Q 59 72 66 60 C 64 48 61 41 50 41 Z"/>
+            </svg>`,
+            OVER: `<svg class="w-full h-full text-amber-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="11.5"/>
+                <path d="M 50 41 C 36 41 32 49 30 62 Q 39 74 32 86 Q 44 100 32 108 C 31 116 38 116 39 108 L 42 82 L 41 122 L 37 185 C 36 194 45 195 47 185 L 49 133 L 51 133 L 53 185 C 55 195 64 194 63 185 L 59 122 L 58 82 L 61 108 C 62 116 69 116 68 108 Q 56 100 68 86 Q 61 74 70 62 C 68 49 64 41 50 41 Z"/>
+            </svg>`,
+            MILD: `<svg class="w-full h-full text-orange-400" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="12"/>
+                <path d="M 50 40 C 33 40 28 50 26 64 Q 37 76 29 88 Q 43 102 29 110 C 28 118 36 118 37 110 L 40 84 L 39 123 L 34 185 C 33 194 43 195 45 185 L 48 134 L 52 134 L 55 185 C 57 195 67 194 66 185 L 61 123 L 60 84 L 63 110 C 64 118 72 118 71 110 Q 57 102 71 88 Q 63 76 74 64 C 72 50 67 40 50 40 Z"/>
+            </svg>`,
+            MODERATE: `<svg class="w-full h-full text-rose-500" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="12.5"/>
+                <path d="M 50 40 C 29 40 24 52 21 66 Q 34 78 25 90 Q 42 106 25 112 C 24 120 33 120 35 112 L 38 86 L 37 124 L 31 185 C 30 195 41 196 43 185 L 47 135 L 53 135 L 57 185 C 59 196 70 195 69 185 L 63 124 L 62 86 L 65 112 C 67 120 76 120 75 112 Q 58 106 75 90 Q 66 78 79 66 C 76 52 71 40 50 40 Z"/>
+            </svg>`,
+            SEVERE: `<svg class="w-full h-full text-purple-500" viewBox="0 0 100 200" fill="currentColor">
+                <circle cx="50" cy="22" r="13"/>
+                <path d="M 50 39 C 24 39 19 53 16 68 Q 31 80 20 93 Q 40 110 20 114 C 19 122 29 122 31 114 L 35 88 L 34 125 L 28 185 C 27 196 38 197 41 185 L 46 136 L 54 136 L 59 185 C 62 197 73 196 72 185 L 66 125 L 65 88 L 69 114 C 71 122 81 122 80 114 Q 60 110 80 93 Q 69 80 84 68 C 81 53 76 39 50 39 Z"/>
+            </svg>`
+        };
+
+        // BMI Categories Mapping
+        const BMI_CATEGORIES = {
+            UNDER: {
+                key: 'UNDER',
+                label: '體重過輕',
+                bgClass: 'bg-sky-500',
+                hexColor: '#38bdf8',
+                iconClass: 'fa-triangle-exclamation',
+                advice: '您的 BMI 低於衛福部標準值。建議加強優質蛋白質與熱量攝取，並搭配運動增加肌肉量。',
+                labelDesc: '體型纖瘦過輕'
+            },
+            NORMAL: {
+                key: 'NORMAL',
+                label: '健康正常',
+                bgClass: 'bg-emerald-500',
+                hexColor: '#10b981',
+                iconClass: 'fa-circle-check',
+                advice: '恭喜！您的 BMI 處於最理想的健康區間，請繼續保持均衡飲食與規律運動習慣。',
+                labelDesc: '身材標緻勻稱'
+            },
+            OVER: {
+                key: 'OVER',
+                label: '體重過重',
+                bgClass: 'bg-amber-500',
+                hexColor: '#f59e0b',
+                iconClass: 'fa-triangle-exclamation',
+                advice: '您的體重已微幅超標，建議適度控制日常高卡路里飲食、減少含糖飲料，並每週安排有氧運動。',
+                labelDesc: '體型微胖過重'
+            },
+            MILD: {
+                key: 'MILD',
+                label: '輕度肥胖',
+                bgClass: 'bg-orange-500',
+                hexColor: '#f97316',
+                iconClass: 'fa-triangle-exclamation',
+                advice: '屬於輕度肥胖。請開始實施飲食控制，並維持每週至少 150 分鐘的中強度有氧運動。',
+                labelDesc: '體型輕度肥胖'
+            },
+            MODERATE: {
+                key: 'MODERATE',
+                label: '中度肥胖',
+                bgClass: 'bg-rose-500',
+                hexColor: '#ef4444',
+                iconClass: 'fa-circle-exclamation',
+                advice: '中度肥胖會增加心血管與代謝慢性疾病風險。建議諮詢醫師或營養師進行系統化減重計畫。',
+                labelDesc: '體型中度肥胖'
+            },
+            SEVERE: {
+                key: 'SEVERE',
+                label: '重度肥胖',
+                bgClass: 'bg-purple-600',
+                hexColor: '#a855f7',
+                iconClass: 'fa-triangle-exclamation',
+                advice: '重度肥胖需高度警惕三高問題。建議前往醫療院所進行專業健康評估與體重管理。',
+                labelDesc: '體型重度肥胖'
+            }
+        };
+
+        // Classify Category based on Taiwan MOHW Standards
+        function getBMICategory(bmi) {
+            if (bmi < 18.5) return BMI_CATEGORIES.UNDER;
+            if (bmi < 24.0) return BMI_CATEGORIES.NORMAL;
+            if (bmi < 27.0) return BMI_CATEGORIES.OVER;
+            if (bmi < 30.0) return BMI_CATEGORIES.MILD;
+            if (bmi < 35.0) return BMI_CATEGORIES.MODERATE;
+            return BMI_CATEGORIES.SEVERE;
+        }
+
+        // Calculate precision position percentage on the multi-segment bar
+        function getBarPercentage(bmi) {
+            // Segment ranges:
+            // [<18.5: 0%-17.5%], [18.5-24: 17.5%-45%], [24-27: 45%-60%],
+            // [27-30: 60%-75%], [30-35: 75%-90%], [>=35: 90%-100%]
+            if (bmi <= 15) return 0;
+            if (bmi >= 40) return 100;
+
+            if (bmi < 18.5) {
+                // 15 to 18.5 -> maps 0% to 17.5%
+                return ((bmi - 15) / (18.5 - 15)) * 17.5;
+            } else if (bmi < 24) {
+                // 18.5 to 24 -> maps 17.5% to 45%
+                return 17.5 + ((bmi - 18.5) / (24 - 18.5)) * 27.5;
+            } else if (bmi < 27) {
+                // 24 to 27 -> maps 45% to 60%
+                return 45 + ((bmi - 24) / (27 - 24)) * 15;
+            } else if (bmi < 27 + 3) { // 27 to 30
+                return 60 + ((bmi - 27) / (30 - 27)) * 15;
+            } else if (bmi < 35) { // 30 to 35
+                return 75 + ((bmi - 30) / (35 - 30)) * 15;
+            } else { // 35 to 40
+                return 90 + ((bmi - 35) / (40 - 35)) * 10;
+            }
+        }
+
+        // Synchronize inputs & sliders
+        function syncAgeSlider() {
+            const ageVal = document.getElementById('input-age').value;
+            document.getElementById('age-val-display').innerText = `${ageVal} 歲`;
+        }
+
+        function syncHeightSlider() {
+            const val = document.getElementById('input-height-cm').value;
+            document.getElementById('slider-height-cm').value = val;
+        }
+
+        function syncHeightInput() {
+            const val = document.getElementById('slider-height-cm').value;
+            document.getElementById('input-height-cm').value = val;
+        }
+
+        function syncWeightSlider() {
+            const val = document.getElementById('input-weight-kg').value;
+            document.getElementById('slider-weight-kg').value = val;
+            document.getElementById('weight-val-display').innerText = `${parseFloat(val).toFixed(1)} kg`;
+        }
+
+        function syncWeightInput() {
+            const val = document.getElementById('slider-weight-kg').value;
+            document.getElementById('input-weight-kg').value = val;
+            document.getElementById('weight-val-display').innerText = `${parseFloat(val).toFixed(1)} kg`;
+        }
+
+        // Switch Unit System
+        function switchUnit(unit) {
+            currentUnit = unit;
+            const metricBtn = document.getElementById('unit-metric-btn');
+            const imperialBtn = document.getElementById('unit-imperial-btn');
+            const metricInputs = document.getElementById('metric-inputs');
+            const imperialInputs = document.getElementById('imperial-inputs');
+
+            if (unit === 'metric') {
+                metricBtn.className = "px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-md transition font-bold";
+                imperialBtn.className = "px-3 py-1.5 rounded-lg hover:text-white transition font-medium text-slate-400";
+                metricInputs.classList.remove('hidden');
+                imperialInputs.classList.add('hidden');
+            } else {
+                imperialBtn.className = "px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-md transition font-bold";
+                metricBtn.className = "px-3 py-1.5 rounded-lg hover:text-white transition font-medium text-slate-400";
+                imperialInputs.classList.remove('hidden');
+                metricInputs.classList.add('hidden');
+            }
+            calculateBMI();
+        }
+
+        // Update Ideal Weight Range Badge
+        function updateIdealWeightBadge() {
+            const heightCm = parseFloat(document.getElementById('input-height-cm').value) || 0;
+            if (heightCm > 0) {
+                const hM = heightCm / 100;
+                const minW = (18.5 * hM * hM).toFixed(1);
+                const maxW = (23.9 * hM * hM).toFixed(1);
+                document.getElementById('ideal-weight-badge-cm').innerText = `理想: ${minW}-${maxW} kg`;
+            }
+        }
+
+        function calculateBMI(event) {
+            if (event) event.preventDefault();
+
+            const gender = document.querySelector('input[name="gender"]:checked').value;
+            const age = parseInt(document.getElementById('input-age').value) || 25;
+            document.getElementById('age-val-display').innerText = `${age} 歲`;
+
+            let heightCm = 0;
+            let weightKg = 0;
+
+            if (currentUnit === 'metric') {
+                heightCm = parseFloat(document.getElementById('input-height-cm').value) || 0;
+                weightKg = parseFloat(document.getElementById('input-weight-kg').value) || 0;
+            } else {
+                const ft = parseFloat(document.getElementById('input-height-ft').value) || 0;
+                const inches = parseFloat(document.getElementById('input-height-in').value) || 0;
+                const lbs = parseFloat(document.getElementById('input-weight-lbs').value) || 0;
+                
+                heightCm = (ft * 12 + inches) * 2.54;
+                weightKg = lbs * 0.453592;
+            }
+
+            if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0) return;
+
+            const heightM = heightCm / 100;
+            const bmi = parseFloat((weightKg / (heightM * heightM)).toFixed(1));
+
+            const category = getBMICategory(bmi);
+
+            // Compute ideal weight & recommended calories
+            const minIdealKg = (18.5 * heightM * heightM).toFixed(1);
+            const maxIdealKg = (23.9 * heightM * heightM).toFixed(1);
+
+            // BMR Estimation
+            let bmr = (gender === 'male')
+                ? 88.36 + (13.4 * weightKg) + (4.8 * heightCm) - (5.7 * age)
+                : 447.6 + (9.2 * weightKg) + (3.1 * heightCm) - (4.3 * age);
+
+            const minCal = Math.round(bmr * 1.2);
+            const maxCal = Math.round(bmr * 1.4);
+
+            // Target gain/loss notice
+            let targetHtml = '';
+            if (weightKg < minIdealKg) {
+                const diff = (minIdealKg - weightKg).toFixed(1);
+                targetHtml = `<span class="text-sky-400 font-bold"><i class="fa-solid fa-arrow-up"></i> 建議增重 ${diff} kg</span> 至理想標準區間`;
+            } else if (weightKg > maxIdealKg) {
+                const diff = (weightKg - maxIdealKg).toFixed(1);
+                targetHtml = `<span class="text-rose-400 font-bold"><i class="fa-solid fa-arrow-down"></i> 建議減重 ${diff} kg</span> 至理想標準區間`;
+            } else {
+                targetHtml = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> 體重完全符合衛福部標準</span>`;
+            }
+            document.getElementById('target-weight-box').innerHTML = targetHtml;
+
+            // Render Numbers & Header
+            document.getElementById('bmi-score').innerText = bmi;
+            document.getElementById('gender-age-tag').innerText = `${gender === 'male' ? '男性' : '女性'} • ${age}歲`;
+            
+            // Render Status Badge
+            const badgeEl = document.getElementById('status-badge');
+            badgeEl.className = `inline-flex items-center space-x-2.5 px-4 py-2 rounded-2xl text-white font-bold text-base ${category.bgClass} shadow-lg`;
+            document.getElementById('status-text').innerText = category.label;
+            document.getElementById('status-icon-mini').className = `fa-solid ${category.iconClass}`;
+
+            // Render Vector Silhouette
+            const silhouetteContainer = document.getElementById('silhouette-container');
+            silhouetteContainer.classList.remove('animate-silhouette');
+            void silhouetteContainer.offsetWidth; // trigger reflow
+            
+            const svgMap = gender === 'male' ? MALE_SILHOUETTES : FEMALE_SILHOUETTES;
+            silhouetteContainer.innerHTML = svgMap[category.key];
+            silhouetteContainer.classList.add('animate-silhouette');
+
+            document.getElementById('silhouette-label').innerText = category.labelDesc;
+
+            // UPDATE FLOATING BADGE & INDICATOR ON PRECISION BAR
+            const percentPos = getBarPercentage(bmi);
+            const floatingBadgeGroup = document.getElementById('floating-badge-group');
+            floatingBadgeGroup.style.left = `${percentPos}%`;
+            
+            document.getElementById('floating-badge-score').innerText = bmi;
+            document.getElementById('floating-badge-bg').style.backgroundColor = category.hexColor;
+            document.getElementById('floating-badge-arrow').style.borderTopColor = category.hexColor;
+            
+            document.getElementById('indicator-bmi-val').innerText = `${bmi} (${category.label})`;
+            document.getElementById('indicator-bmi-val').style.color = category.hexColor;
+
+            // UPDATE 6 MODULAR CATEGORY CARDS MATRIX HIGHLIGHT
+            Object.keys(BMI_CATEGORIES).forEach(key => {
+                const card = document.getElementById(`cat-card-${key}`);
+                const checkIcon = card.querySelector('.check-icon');
+
+                if (key === category.key) {
+                    card.className = `glass-card p-4 rounded-2xl border active-category-card relative overflow-hidden flex flex-col justify-between`;
+                    card.style.borderColor = category.hexColor;
+                    if (checkIcon) checkIcon.classList.remove('hidden');
+                } else {
+                    card.className = `glass-card p-4 rounded-2xl border border-slate-800 inactive-category-card relative overflow-hidden flex flex-col justify-between`;
+                    card.style.borderColor = '';
+                    if (checkIcon) checkIcon.classList.add('hidden');
+                }
+            });
+
+            // Advice & Range
+            document.getElementById('health-advice').innerText = category.advice;
+            document.getElementById('ideal-weight-range').innerText = `${minIdealKg} ~ ${maxIdealKg} kg`;
+            document.getElementById('calorie-recommendation').innerText = `${minCal} ~ ${maxCal} kcal`;
+
+            // Save Record on Form Submit
+            if (event && event.type === 'submit') {
+                saveRecord({
+                    id: Date.now(),
+                    date: new Date().toLocaleString('zh-TW', { dateStyle: 'short', timeStyle: 'short' }),
+                    gender: gender === 'male' ? '男' : '女',
+                    age: age,
+                    height: `${heightCm.toFixed(0)} cm`,
+                    weight: `${weightKg.toFixed(1)} kg`,
+                    bmi: bmi,
+                    categoryLabel: category.label,
+                    bgClass: category.bgClass
+                });
+            }
+        }
+
+        const STORAGE_KEY = 'bmi_pro_history_v4';
+
+        function getRecords() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveRecord(record) {
+            const records = getRecords();
+            records.unshift(record);
+            if (records.length > 10) records.pop();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            renderHistoryTable();
+        }
+
+        function deleteRecord(id) {
+            let records = getRecords();
+            records = records.filter(r => r.id !== id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            renderHistoryTable();
+        }
+
+        function clearHistory() {
+            localStorage.removeItem(STORAGE_KEY);
+            renderHistoryTable();
+        }
+
+        function renderHistoryTable() {
+            const records = getRecords();
+            const tbody = document.getElementById('history-table-body');
+            const noHistoryMsg = document.getElementById('no-history-msg');
+
+            if (records.length === 0) {
+                tbody.innerHTML = '';
+                noHistoryMsg.classList.remove('hidden');
+                return;
+            }
+
+            noHistoryMsg.classList.add('hidden');
+            tbody.innerHTML = records.map(r => `
+                <tr class="hover:bg-slate-800/50 transition">
+                    <td class="py-3 px-4 text-xs text-slate-400">${r.date}</td>
+                    <td class="py-3 px-4 text-slate-200 font-medium">${r.gender} / ${r.age}歲</td>
+                    <td class="py-3 px-4 text-slate-200">${r.height} / ${r.weight}</td>
+                    <td class="py-3 px-4 font-bold text-white font-display">${r.bmi}</td>
+                    <td class="py-3 px-4">
+                        <span class="inline-block px-2.5 py-0.5 rounded-md text-xs font-bold text-white ${r.bgClass}">
+                            ${r.categoryLabel}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="deleteRecord(${r.id})" class="text-slate-500 hover:text-rose-400 p-1 transition" title="刪除">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function scrollToHistory() {
+            document.getElementById('history-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // On Page Load Initialization
+        window.onload = function() {
+            syncHeightSlider();
+            syncWeightSlider();
+            updateIdealWeightBadge();
+            calculateBMI();
+            renderHistoryTable();
+        };
+    </script>
+</body>
+</html>
